@@ -28,8 +28,9 @@ This creates/updates `spacex_news_log.csv` and `seen_links.json` in the project 
 
 `.github/workflows/monitor.yml` runs the script automatically on GitHub Actions:
 
-- **Trigger**: a cron schedule of `*/30 * * * *` (every 30 minutes, UTC), plus a manual `workflow_dispatch` trigger for on-demand runs.
+- **Trigger**: a cron schedule of `* * * * *` (every minute, UTC), plus a manual `workflow_dispatch` trigger for on-demand runs.
 - **Steps**: checks out the repo, sets up Python 3.11, installs `requirements.txt`, and runs `spacex_monitor.py`.
 - **Persistence**: if `spacex_news_log.csv` or `seen_links.json` changed, the workflow commits and pushes them back to the repo using a bot identity (`github-actions[bot]`). The commit message includes `[skip ci]` to avoid re-triggering other workflows. If nothing changed, no commit is made.
+- **Concurrency**: runs are grouped under `spacex-news-monitor` so a new run queues instead of overlapping a still-running one, which avoids two jobs racing to commit/push at once.
 
-Note: GitHub Actions cron schedules are not guaranteed to run at the exact minute — they can be delayed during periods of high load.
+Note: GitHub Actions does not guarantee scheduled workflows fire at the exact minute — under load, runs are commonly delayed by several minutes even with a `* * * * *` cron, so treat "every minute" as a target rather than a guarantee.

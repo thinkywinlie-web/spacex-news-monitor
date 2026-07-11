@@ -2,11 +2,15 @@ name: SpaceX News Monitor
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "* * * * *"
   workflow_dispatch: {}
 
 permissions:
   contents: write
+
+concurrency:
+  group: spacex-news-monitor
+  cancel-in-progress: false
 
 jobs:
   monitor:
