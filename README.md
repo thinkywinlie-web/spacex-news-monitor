@@ -13,7 +13,7 @@ Automatically tracks SpaceX-related news headlines and their sentiment over time
 2. Filters the mainstream/niche feeds to entries whose title or summary mentions `spacex`, `starship`, `falcon 9`, `falcon heavy`, or `elon musk` (case-insensitive). The search feeds are already query-scoped, so they aren't filtered further.
 3. Scores each headline's sentiment with `vaderSentiment`. A compound score `>= 0.25` is labeled `positive`, `<= -0.25` is `negative`, otherwise `neutral`.
 4. Dedupes against `seen_links.json` so re-running the script never re-logs the same article.
-5. Appends new rows to `spacex_news_log.csv` with columns: `fetched_at_utc, source, published, title, link, sentiment_score, sentiment_label`.
+5. Adds new rows to `spacex_news_log.csv` with columns: `fetched_at_utc, source, published, title, link, sentiment_score, sentiment_label`. On every run the whole file is re-sorted by `published` date, newest first, so new entries land wherever they belong chronologically rather than always at the bottom.
 
 ## Running locally
 

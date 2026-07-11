@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timezone
 
 import feedparser
+from dateutil import parser as date_parser
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -74,6 +75,40 @@ def classify_sentiment(compound_score):
     return "neutral"
 
 
+MIN_DATETIME = datetime.min.replace(tzinfo=timezone.utc)
+
+
+def parse_date_string(value):
+    """Best-effort parse of a date string into an aware UTC-comparable datetime."""
+    if not value:
+        return MIN_DATETIME
+    try:
+        parsed = date_parser.parse(value)
+    except (ValueError, OverflowError):
+        return MIN_DATETIME
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def parse_published(entry):
+    """Sort key for a feed entry, preferring feedparser's normalized struct_time."""
+    struct_time = entry.get("published_parsed") or entry.get("updated_parsed")
+    if struct_time:
+        try:
+            return datetime(*struct_time[:6], tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            pass
+    return parse_date_string(entry.get("published", entry.get("updated", "")))
+
+
+def load_existing_rows():
+    if not os.path.exists(CSV_PATH):
+        return []
+    with open(CSV_PATH, "r", newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
 def fetch_entries():
     """Fetch and filter entries from all feeds, returning a list of (source, entry) tuples."""
     collected = []
@@ -122,20 +157,28 @@ def main():
             "link": link,
             "sentiment_score": compound,
             "sentiment_label": label,
+            "_sort_key": parse_published(entry),
         })
         seen_links.add(link)
 
-    if new_rows:
-        file_exists = os.path.exists(CSV_PATH)
-        with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
-            if not file_exists:
-                writer.writeheader()
-            writer.writerows(new_rows)
-        save_seen_links(seen_links)
-        print(f"Added {len(new_rows)} new entries to {CSV_PATH}")
-    else:
+    if not new_rows:
         print("No new entries found.")
+        return
+
+    existing_rows = load_existing_rows()
+    for row in existing_rows:
+        row["_sort_key"] = parse_date_string(row.get("published", ""))
+
+    all_rows = existing_rows + new_rows
+    all_rows.sort(key=lambda row: row["_sort_key"], reverse=True)
+
+    with open(CSV_PATH, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(all_rows)
+
+    save_seen_links(seen_links)
+    print(f"Added {len(new_rows)} new entries; {len(all_rows)} total, sorted newest first")
 
 
 if __name__ == "__main__":
